@@ -47,7 +47,12 @@ Ne créent **aucune** émeraude — ils ne font que déplacer de l'argent exista
   commande n'est publiée (§3.6).
 
 > Chaîne complète : mines/Bountiful → joueurs → marché → **taxes** → Trésor → **commandes
-> municipales** → joueurs. Auto-équilibrée : la ville ne peut redistribuer que ce qu'elle a taxé.
+> municipales** → joueurs. Auto-équilibrée : une fois le budget de départ épuisé, la ville ne
+> peut redistribuer que ce qu'elle a taxé.
+
+> **Budget de départ** : le Trésor démarre avec une somme initiale (configurable par l'admin) pour
+> que les commandes municipales puissent tourner **dès le jour 1**. C'est une dotation **unique**,
+> pas un robinet récurrent : ensuite le Trésor ne se remplit que par les taxes.
 
 **🔻 Les drains**
 - Les **besoins des villageois** consomment des produits payés par le Trésor (l'argent ressort).
@@ -115,6 +120,8 @@ Deux méthodes, **même système sécurisé**, même historique :
 ### 3.5 Trésor de la Cité
 
 - **Compte spécial** (pas un joueur) qui reçoit **toutes les taxes** (5 % marché, 2 % boutiques).
+- **Démarre avec un budget de départ** (montant configurable) pour lancer les commandes dès le
+  jour 1. Dotation unique ; ensuite alimenté uniquement par les taxes.
 - Sert à **financer les commandes municipales** (§3.6).
 - **Consultable** par tous ; **modifiable** seulement par les administrateurs / le rôle RP « Trésorier »
   (commandes admin pour ajuster taux de taxe et solde selon les lois RP).
@@ -217,12 +224,17 @@ jouable rapidement.
 
 ---
 
-## 9. Questions ouvertes / à trancher plus tard
+## 9. Décisions prises & questions restantes
 
-- Nom et *modid* définitifs du mod (proposition au scaffolding, ex. `citeconomy` / `fdpcfa`).
+Décidé :
+
+- **`modid` = `citeconomy`** (nom technique du mod).
+- **Budget de départ du Trésor** activé → commandes municipales dès le jour 1 (dotation unique
+  configurable).
+- **Aucun plafond** de retrait, d'annonces ou de boutiques par joueur — on reste simple.
+
+À détailler dans le plan d'implémentation (pas bloquant) :
+
 - Détail exact des besoins hebdo par palier de population et de la courbe de Prospérité.
-- Faut-il un **plafond de retrait** ou d'annonces par joueur pour limiter les abus.
-- Bootstrapping : au tout début le Trésor est vide (pas encore de taxes) → les joueurs gagnent
-  d'abord via mines + Bountiful, puis les commandes municipales démarrent une fois le Trésor
-  alimenté. À confirmer que ce démarrage progressif te convient.
+- Montant par défaut du budget de départ et des taux de taxe (valeurs de config).
 - Apparence des blocs (textures, modèles) — cosmétique, après le fonctionnel.
