@@ -15,28 +15,23 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 public class PersonalShopScreen extends AbstractContainerScreen<PersonalShopMenu> {
 
-    // --- SDM-style colors ---
-    private static final int DARK_BG = 0xCC0A0A0A;
-    private static final int HEADER_BG = 0xAA0A0A0A;
-    private static final int PANEL_FILL = 0x99141414;
-    private static final int PANEL_BORDER = 0x442A2A2A;
-    private static final int SLOT_FILL = 0xCC1E1E1E;
-    private static final int SLOT_BORDER = 0x44333333;
-    private static final int GOLD = 0xFFB3954E;
-    private static final int GOLD_DIM = 0x44B3954E;
-    private static final int GOLD_SELECTED = 0x66B3954E;
-    private static final int WHITE_SELECTED = 0x55FFFFFF;
-    private static final int GREEN_BUY = 0xFF3D8C40;
-    private static final int GREEN_BUY_HOVER = 0xFF4CAF50;
-    private static final int BUTTON_GRAY = 0x55444444;
-    private static final int BUTTON_GRAY_HOVER = 0x66555555;
-    private static final int TEXT_WHITE = 0xFFFFFF;
-    private static final int TEXT_GRAY = 0xAAAAAA;
-    private static final int TEXT_GOLD = 0xB3954E;
-    private static final int TEXT_GREEN = 0x55FF55;
-    private static final int TEXT_RED = 0xFF5555;
-
     private static final int SHOP_SLOTS = 27;
+
+    // --- SDM Shop modern colors (RGBA semi-transparent) ---
+    private static final int OVERLAY_BG    = 0xBB000000;
+    private static final int PANEL_BG      = 0x7F000000;
+    private static final int SLOT_ON_SALE  = 0x55FFFFFF;
+    private static final int SLOT_HAS_ITEM = 0x55000000;
+    private static final int SLOT_EMPTY    = 0x3C000000;
+    private static final int SLOT_SELECTED = 0x78FFFFFF;
+    private static final int LABEL_BG      = 0x7F000000;
+    private static final int DIVIDER       = 0x3FFFFFFF;
+    private static final int TEXT_WHITE    = 0xFFFFFF;
+    private static final int TEXT_GRAY     = 0xAAAAAA;
+    private static final int TEXT_GREEN    = 0x55FF55;
+    private static final int TEXT_RED      = 0xFF5555;
+    private static final int BTN_CONFIRM   = 0x7F555555;
+    private static final int BTN_CANCEL    = 0x7F333333;
 
     private EditBox priceInput;
     private int selectedSlot = -1;
@@ -58,7 +53,8 @@ public class PersonalShopScreen extends AbstractContainerScreen<PersonalShopMenu
         if (this.menu.isOwner() && this.menu.getBlockEntity() != null) {
             int x = (width - imageWidth) / 2;
             int y = (height - imageHeight) / 2;
-            this.priceInput = new EditBox(this.font, x + 8, y + 172, 80, 12, Component.translatable("gui.citeconomy.shop.price_field"));
+            this.priceInput = new EditBox(this.font, x + 8, y + 60, 80, 12,
+                    Component.translatable("gui.citeconomy.shop.price_field"));
             this.priceInput.setMaxLength(6);
             this.priceInput.setResponder(s -> {
                 if (!s.matches("\\d*")) {
@@ -69,13 +65,10 @@ public class PersonalShopScreen extends AbstractContainerScreen<PersonalShopMenu
         }
     }
 
-    // ======================= RENDER =======================
-
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         super.render(graphics, mouseX, mouseY, partialTick);
-
         if (showConfirmOverlay) {
             renderBuyConfirmOverlay(graphics, mouseX, mouseY);
         }
@@ -87,171 +80,217 @@ public class PersonalShopScreen extends AbstractContainerScreen<PersonalShopMenu
         int x = (width - imageWidth) / 2;
         int y = (height - imageHeight) / 2;
 
-        // Main background
-        fillPanel(graphics, x, y, imageWidth, imageHeight, DARK_BG);
+        // Full screen dark overlay
+        fill(graphics, 0, 0, width, height, 0x66000000);
 
-        // Header bar
-        fillPanel(graphics, x, y, imageWidth, 16, HEADER_BG);
-        graphics.fill(x, y + 16, x + imageWidth, y + 17, GOLD);
+        // Main panel background — SDM style dark semi-transparent
+        fillRounded(graphics, x, y, imageWidth, imageHeight, PANEL_BG);
 
-        // Shop area panel
-        fillPanel(graphics, x + 2, y + 18, 172, 56, PANEL_FILL);
-        graphics.fill(x + 2, y + 18, x + 174, y + 19, PANEL_BORDER);
+        // Top accent line
+        graphics.fill(x + 2, y + 14, x + imageWidth - 2, y + 15, DIVIDER);
 
-        // Separator between shop and player inventory
-        graphics.fill(x + 4, y + 78, x + imageWidth - 4, y + 79, GOLD_DIM);
+        // Shop area label
+        graphics.drawString(this.font, Component.literal("§7" + this.title.getString()), x + 8, y + 4, TEXT_GRAY, false);
 
-        // Player inventory panel
-        fillPanel(graphics, x + 2, y + 82, 172, 78, PANEL_FILL);
+        // Separator between shop area and edit/player area
+        graphics.fill(x + 4, y + 74, x + imageWidth - 4, y + 75, DIVIDER);
 
-        // Render slots with custom backgrounds
+        // Player inventory label
+        graphics.drawString(this.font, Component.literal("§7Inventaire"), x + 8, y + 80, TEXT_GRAY, false);
+
+        // --- Render slots with SDM-style backgrounds ---
         if (this.menu.getBlockEntity() != null) {
             for (Slot slot : this.menu.slots) {
                 int sx = x + slot.x;
                 int sy = y + slot.y;
 
                 if (slot.index < SHOP_SLOTS) {
-                    renderShopSlotBg(graphics, sx, sy, slot.index);
+                    renderSdmSlot(graphics, sx, sy, slot.index);
                 } else {
-                    renderPlayerSlotBg(graphics, sx, sy);
+                    // Player inventory slots: subtle dark
+                    graphics.fill(sx - 1, sy - 1, sx + 17, sy + 17, 0x44000000);
+                    graphics.fill(sx, sy, sx + 16, sy + 16, 0x33000000);
+                }
+            }
+        }
+
+        // --- SDM-style price labels under shop slots ---
+        if (this.menu.getBlockEntity() != null) {
+            for (Slot slot : this.menu.slots) {
+                if (slot.index < SHOP_SLOTS) {
+                    int sx = x + slot.x;
+                    int sy = y + slot.y;
+                    int price = this.menu.getSlotPrice(slot.index);
+                    boolean onSale = price > 0 && !slot.getItem().isEmpty();
+
+                    if (onSale) {
+                        String priceStr = price + "§r";
+                        int pW = this.font.width(priceStr);
+                        int labelX = sx + 8 - pW / 2;
+                        fill(graphics, labelX - 2, sy + 12, labelX + pW + 2, sy + 17, LABEL_BG);
+                        graphics.drawString(this.font, Component.literal("§f" + priceStr), labelX, sy + 12, TEXT_WHITE, false);
+                    }
                 }
             }
         }
     }
 
-    private void renderShopSlotBg(GuiGraphics graphics, int x, int y, int slot) {
+    private void renderSdmSlot(GuiGraphics graphics, int x, int y, int slot) {
         boolean isSelected = slot == selectedSlot;
         boolean onSale = this.menu.getSlotPrice(slot) > 0
                 && this.menu.getBlockEntity().getInventory().getStackInSlot(slot).isEmpty() == false;
         boolean hasItem = this.menu.getBlockEntity().getInventory().getStackInSlot(slot).isEmpty() == false;
 
+        int color;
         if (isSelected) {
-            graphics.fill(x - 1, y - 1, x + 17, y + 17, WHITE_SELECTED);
-            graphics.fill(x - 1, y - 1, x + 17, y + 17, GOLD_SELECTED);
+            color = SLOT_SELECTED;
         } else if (onSale) {
-            graphics.fill(x - 1, y - 1, x + 17, y + 17, GOLD_DIM);
+            color = SLOT_ON_SALE;
         } else if (hasItem) {
-            graphics.fill(x - 1, y - 1, x + 17, y + 17, PANEL_BORDER);
+            color = SLOT_HAS_ITEM;
         } else {
-            graphics.fill(x - 1, y - 1, x + 17, y + 17, SLOT_BORDER);
+            color = SLOT_EMPTY;
         }
 
-        graphics.fill(x, y, x + 16, y + 16, SLOT_FILL);
+        graphics.fill(x - 1, y - 1, x + 17, y + 17, color);
 
-        // Small indicator for on-sale items
-        if (onSale && !isSelected) {
-            graphics.fill(x + 1, y + 1, x + 4, y + 4, GOLD);
-        }
+        // Subtle inner border
+        graphics.fill(x, y, x + 1, y + 16, 0x22FFFFFF);
+        graphics.fill(x + 15, y, x + 16, y + 16, 0x22000000);
+        graphics.fill(x, y, x + 16, y + 1, 0x22FFFFFF);
+        graphics.fill(x, y + 15, x + 16, y + 16, 0x22000000);
     }
 
-    private void renderPlayerSlotBg(GuiGraphics graphics, int x, int y) {
-        graphics.fill(x - 1, y - 1, x + 17, y + 17, PANEL_BORDER);
-        graphics.fill(x, y, x + 16, y + 16, SLOT_FILL);
+    private void fill(GuiGraphics graphics, int x, int y, int w, int h, int color) {
+        graphics.fill(x, y, w, h, color);
     }
 
-    private void fillPanel(GuiGraphics graphics, int x, int y, int w, int h, int color) {
-        graphics.fill(x, y, x + w, y + h, color);
+    private void fillRounded(GuiGraphics graphics, int x, int y, int w, int h, int color) {
+        // Approximate rounded corners with layered fills
+        graphics.fill(x + 2, y, x + w - 2, y + h, color);
+        graphics.fill(x, y + 2, x + w, y + h - 2, color);
+        graphics.fill(x + 1, y + 1, x + w - 1, y + h - 1, color);
     }
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        int x = (width - imageWidth) / 2;
-        int y = (height - imageHeight) / 2;
+        if (this.menu.getBlockEntity() == null) return;
 
-        // Header
-        graphics.drawString(this.font, Component.literal("§6✦ §f") .append(this.title), 8, 5, TEXT_WHITE, false);
-
-        if (!showConfirmOverlay && this.menu.getBlockEntity() != null) {
-            if (this.menu.isOwner()) {
-                Component modeText = selectedSlot >= 0
-                        ? Component.translatable("gui.citeconomy.shop.slot_info", selectedSlot + 1, this.menu.getSlotPrice(selectedSlot))
-                        : Component.translatable("gui.citeconomy.shop.click_hint");
-                graphics.drawString(this.font, modeText, 8, 162, TEXT_WHITE, false);
+        // Owner mode: show price info
+        if (this.menu.isOwner()) {
+            if (selectedSlot >= 0) {
+                String info = "§7Slot §f" + (selectedSlot + 1) + "§7: §f" + this.menu.getSlotPrice(selectedSlot) + " Cr";
+                graphics.drawString(this.font, Component.literal(info), 8, 62, TEXT_GRAY, false);
             }
-
-            // Balance display
-            int balance = ClientState.getBalance();
-            Component balanceText = Component.translatable("gui.citeconomy.market.balance", balance);
-            graphics.drawString(this.font, balanceText, imageWidth - this.font.width(balanceText) - 8, 172, TEXT_GRAY, false);
         }
+
+        // Balance at bottom
+        int balance = ClientState.getBalance();
+        Component balText = Component.translatable("gui.citeconomy.market.balance", balance);
+        graphics.drawString(this.font, balText, imageWidth - this.font.width(balText) - 8, 174, TEXT_GRAY, false);
     }
 
-    // ======================= BUY CONFIRM OVERLAY =======================
+    // ================================================================== //
+    //  BUY CONFIRM OVERLAY — Modern SDM BuyerScreen style                //
+    // ================================================================== //
 
     private void renderBuyConfirmOverlay(GuiGraphics graphics, int mouseX, int mouseY) {
         int cx = (width - imageWidth) / 2 + imageWidth / 2;
         int cy = (height - imageHeight) / 2 + imageHeight / 2;
 
         int pw = 150;
-        int ph = 90;
+        int ph = 110;
         int px = cx - pw / 2;
         int py = cy - ph / 2;
 
-        // Dark overlay background
-        fillPanel(graphics, px - 1, py - 1, pw + 2, ph + 2, 0x66000000);
+        // Outer dark overlay
+        fill(graphics, 0, 0, width, height, 0x88000000);
 
-        // Main panel
-        fillPanel(graphics, px, py, pw, ph, 0xDD141414);
+        // Main panel — dark rounded (SDM style)
+        fillRounded(graphics, px, py, pw, ph, 0xDD141414);
+        graphics.fill(px + 1, py + 1, px + pw - 1, py + ph - 1, 0xDD141414);
 
-        // Gold accent border
-        graphics.fill(px, py, px + pw, py + 1, GOLD);
-        graphics.fill(px, py + ph - 1, px + pw, py + ph, GOLD);
-        graphics.fill(px, py, px + 1, py + ph, GOLD);
-        graphics.fill(px + pw - 1, py, px + pw, py + ph, GOLD);
-
-        // Header line
-        graphics.fill(px + 4, py + 22, px + pw - 4, py + 23, GOLD_DIM);
-
-        // Item icon
+        // --- Item section ---
+        // Icon
         if (!confirmStack.isEmpty()) {
-            graphics.renderItem(confirmStack, px + 10, py + 6);
-
-            // Item name
-            graphics.drawString(this.font, confirmStack.getHoverName(), px + 30, py + 7, TEXT_WHITE, false);
-
-            // Price
-            Component priceText = Component.translatable("gui.citeconomy.shop.buy_confirm_price", confirmPrice);
-            graphics.drawString(this.font, priceText, px + 30, py + 17, TEXT_GOLD, false);
+            graphics.renderItem(confirmStack, px + 10, py + 8);
+            graphics.renderItemDecorations(this.font, confirmStack, px + 10, py + 8);
         }
 
-        // Your balance
+        // Item name bar
+        String name = confirmStack.isEmpty() ? "" : confirmStack.getHoverName().getString();
+        int nameW = this.font.width(name);
+        int nameBarW = Math.min(nameW + 12, pw - 80);
+        fill(graphics, px + 34, py + 8, px + 34 + nameBarW, py + 20, LABEL_BG);
+        graphics.drawString(this.font, Component.literal("§f" + name), px + 40, py + 10, TEXT_WHITE, false);
+
+        // Price bar
+        String priceStr = "§7Prix: §f" + confirmPrice + " Cr";
+        int priceW = this.font.width(Component.literal(priceStr));
+        fill(graphics, px + 34, py + 22, px + 34 + priceW + 8, py + 34, LABEL_BG);
+        graphics.drawString(this.font, Component.literal(priceStr), px + 40, py + 24, TEXT_WHITE, false);
+
+        // --- Divider ---
+        graphics.fill(px + 10, py + 40, px + pw - 10, py + 41, DIVIDER);
+
+        // --- Two-column stats (ModernBuyerScreen style) ---
+        int colW = (pw - 30) / 2;
+        int statY = py + 46;
+
+        // Col 1: Your money
         int balance = ClientState.getBalance();
+        fill(graphics, px + 10, statY, px + 10 + colW, statY + 14, LABEL_BG);
+        graphics.drawString(this.font, Component.literal("§7Votre argent"), px + 14, statY + 3, TEXT_GRAY, false);
+        fill(graphics, px + 12 + colW, statY, px + 10 + colW * 2, statY + 14, LABEL_BG);
+        graphics.drawString(this.font, Component.literal("§" + (balance >= confirmPrice ? "a" : "c") + balance + " Cr"),
+                px + 16 + colW, statY + 3, TEXT_WHITE, false);
+
+        // Col 2: Can be buy
+        fill(graphics, px + 10, statY + 16, px + 10 + colW, statY + 30, LABEL_BG);
+        graphics.drawString(this.font, Component.literal("§7Achetable"), px + 14, statY + 19, TEXT_GRAY, false);
+        fill(graphics, px + 12 + colW, statY + 16, px + 10 + colW * 2, statY + 30, LABEL_BG);
         boolean canAfford = balance >= confirmPrice;
-        String balColor = canAfford ? "§a" : "§c";
-        Component balanceLabel = Component.translatable("gui.citeconomy.shop.buy_confirm_balance", balColor, balance);
-        graphics.drawString(this.font, balanceLabel, px + 10, py + 30, TEXT_WHITE, false);
+        graphics.drawString(this.font, Component.literal("§" + (canAfford ? "aOui" : "cNon")),
+                px + 16 + colW, statY + 19, TEXT_WHITE, false);
 
-        // Buy button
-        int buyBtnX = px + 15;
-        int buyBtnY = py + 50;
-        int btnW = 50;
+        // --- You will spend ---
+        int spendY = statY + 34;
+        fill(graphics, px + 10, spendY, px + pw - 10, spendY + 14, LABEL_BG);
+        graphics.drawString(this.font, Component.literal("§7Vous allez dépenser : §f" + confirmPrice + " Cr"),
+                px + 14, spendY + 3, TEXT_WHITE, false);
+
+        // --- Count text input (simulated: just show "x1" for now) ---
+        int countY = spendY + 18;
+        fill(graphics, px + 10, countY, px + pw - 10, countY + 16, LABEL_BG);
+        graphics.drawString(this.font, Component.literal("§7Quantité : §f1"), px + 14, countY + 3, TEXT_GRAY, false);
+
+        // --- Buttons: Cancel (left), Confirm (right) ---
+        int btnW = 55;
         int btnH = 16;
-        boolean hoverBuy = mouseX >= buyBtnX && mouseX <= buyBtnX + btnW
-                && mouseY >= buyBtnY && mouseY <= buyBtnY + btnH;
+        int btnY = py + ph - 22;
 
-        if (canAfford) {
-            fillPanel(graphics, buyBtnX, buyBtnY, btnW, btnH, hoverBuy ? GREEN_BUY_HOVER : GREEN_BUY);
-        } else {
-            fillPanel(graphics, buyBtnX, buyBtnY, btnW, btnH, 0x66333333);
-        }
-        graphics.fill(buyBtnX, buyBtnY, buyBtnX + btnW, buyBtnY + 1, GOLD_DIM);
-        graphics.drawString(this.font, Component.translatable("gui.citeconomy.shop.buy_button.plain"),
-                buyBtnX + (btnW - font.width(Component.translatable("gui.citeconomy.shop.buy_button.plain"))) / 2,
-                buyBtnY + 4, canAfford ? TEXT_WHITE : TEXT_GRAY, false);
-
-        // Cancel button
-        int cancelBtnX = px + pw - 15 - btnW;
-        boolean hoverCancel = mouseX >= cancelBtnX && mouseX <= cancelBtnX + btnW
-                && mouseY >= buyBtnY && mouseY <= buyBtnY + btnH;
-
-        fillPanel(graphics, cancelBtnX, buyBtnY, btnW, btnH, hoverCancel ? BUTTON_GRAY_HOVER : BUTTON_GRAY);
-        graphics.fill(cancelBtnX, buyBtnY, cancelBtnX + btnW, buyBtnY + 1, PANEL_BORDER);
+        // Cancel
+        int cancelX = px + (pw / 2) - btnW - 6;
+        boolean hoverCancel = mouseX >= cancelX && mouseX <= cancelX + btnW
+                && mouseY >= btnY && mouseY <= btnY + btnH;
+        fillRounded(graphics, cancelX, btnY, btnW, btnH, hoverCancel ? 0x7F555555 : BTN_CANCEL);
         graphics.drawString(this.font, Component.translatable("gui.citeconomy.shop.cancel_button.plain"),
-                cancelBtnX + (btnW - font.width(Component.translatable("gui.citeconomy.shop.cancel_button.plain"))) / 2,
-                buyBtnY + 4, TEXT_WHITE, false);
+                cancelX + (btnW - font.width(Component.translatable("gui.citeconomy.shop.cancel_button.plain"))) / 2,
+                btnY + 4, TEXT_WHITE, false);
+
+        // Confirm
+        int confirmX = px + (pw / 2) + 6;
+        boolean hoverConfirm = mouseX >= confirmX && mouseX <= confirmX + btnW
+                && mouseY >= btnY && mouseY <= btnY + btnH;
+        fillRounded(graphics, confirmX, btnY, btnW, btnH, hoverConfirm ? 0x7F777777 : BTN_CONFIRM);
+        graphics.drawString(this.font, Component.translatable("gui.citeconomy.shop.buy_button.plain"),
+                confirmX + (btnW - font.width(Component.translatable("gui.citeconomy.shop.buy_button.plain"))) / 2,
+                btnY + 4, canAfford ? TEXT_WHITE : TEXT_GRAY, false);
     }
 
-    // ======================= TOOLTIP =======================
+    // ================================================================== //
+    //  TOOLTIP                                                            //
+    // ================================================================== //
 
     @Override
     protected void renderTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -270,7 +309,9 @@ public class PersonalShopScreen extends AbstractContainerScreen<PersonalShopMenu
         super.renderTooltip(graphics, mouseX, mouseY);
     }
 
-    // ======================= KEYBOARD =======================
+    // ================================================================== //
+    //  KEYBOARD                                                           //
+    // ================================================================== //
 
     @Override
     public boolean keyPressed(int key, int scanCode, int modifiers) {
@@ -303,7 +344,9 @@ public class PersonalShopScreen extends AbstractContainerScreen<PersonalShopMenu
         } catch (NumberFormatException ignored) {}
     }
 
-    // ======================= MOUSE =======================
+    // ================================================================== //
+    //  MOUSE                                                              //
+    // ================================================================== //
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
@@ -340,18 +383,18 @@ public class PersonalShopScreen extends AbstractContainerScreen<PersonalShopMenu
         int cy = (height - imageHeight) / 2 + imageHeight / 2;
 
         int pw = 150;
-        int ph = 90;
+        int ph = 110;
         int px = cx - pw / 2;
         int py = cy - ph / 2;
 
-        int btnW = 50;
+        int btnW = 55;
         int btnH = 16;
-        int buyBtnY = py + 50;
+        int btnY = py + ph - 22;
 
-        // Buy button
-        int buyBtnX = px + 15;
-        if (mouseX >= buyBtnX && mouseX <= buyBtnX + btnW
-                && mouseY >= buyBtnY && mouseY <= buyBtnY + btnH) {
+        // Confirm button
+        int confirmX = px + (pw / 2) + 6;
+        if (mouseX >= confirmX && mouseX <= confirmX + btnW
+                && mouseY >= btnY && mouseY <= btnY + btnH) {
             int balance = ClientState.getBalance();
             if (balance >= confirmPrice) {
                 PacketDistributor.sendToServer(new ShopBuyPayload(
@@ -362,9 +405,9 @@ public class PersonalShopScreen extends AbstractContainerScreen<PersonalShopMenu
         }
 
         // Cancel button
-        int cancelBtnX = px + pw - 15 - btnW;
-        if (mouseX >= cancelBtnX && mouseX <= cancelBtnX + btnW
-                && mouseY >= buyBtnY && mouseY <= buyBtnY + btnH) {
+        int cancelX = px + (pw / 2) - btnW - 6;
+        if (mouseX >= cancelX && mouseX <= cancelX + btnW
+                && mouseY >= btnY && mouseY <= btnY + btnH) {
             showConfirmOverlay = false;
             return true;
         }
