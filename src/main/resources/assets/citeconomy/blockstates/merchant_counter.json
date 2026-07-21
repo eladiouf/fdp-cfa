@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "citeconomy:block/merchant_counter" }
+  }
+}

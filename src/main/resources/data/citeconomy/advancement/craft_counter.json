@@ -1,0 +1,35 @@
+{
+  "display": {
+    "icon": {
+      "item": "citeconomy:merchant_counter"
+    },
+    "title": {
+      "translate": "advancement.citeconomy.craft_counter.title"
+    },
+    "description": {
+      "translate": "advancement.citeconomy.craft_counter.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "citeconomy:root",
+  "criteria": {
+    "has_counter": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "citeconomy:merchant_counter"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_counter"
+    ]
+  ]
+}

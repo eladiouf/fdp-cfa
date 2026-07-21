@@ -1,0 +1,29 @@
+{
+  "coin_spend": {
+    "sounds": ["minecraft:entity/experience_orb/pickup"]
+  },
+  "coin_receive": {
+    "sounds": ["minecraft:entity/experience_orb/pling"]
+  },
+  "shop_buy": {
+    "sounds": ["minecraft:entity/villager/trade1", "minecraft:entity/villager/trade2"]
+  },
+  "shop_sell": {
+    "sounds": ["minecraft:entity/villager/trade1", "minecraft:entity/villager/trade2"]
+  },
+  "economy_success": {
+    "sounds": ["minecraft:block/note_block/pling"]
+  },
+  "economy_error": {
+    "sounds": ["minecraft:entity/villager/no"]
+  },
+  "ui_click": {
+    "sounds": ["minecraft:ui/button/click"]
+  },
+  "company_create": {
+    "sounds": ["minecraft:entity/villager/celebrate"]
+  },
+  "company_dissolve": {
+    "sounds": ["minecraft:entity/zombie/break_wooden_door"]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "display": {
+    "icon": {
+      "item": "minecraft:diamond"
+    },
+    "title": {
+      "translate": "advancement.citeconomy.wealthy.title"
+    },
+    "description": {
+      "translate": "advancement.citeconomy.wealthy.desc"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "citeconomy:rich",
+  "criteria": {
+    "has_diamonds": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:diamond",
+            "count": 10
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_diamonds"
+    ]
+  ]
+}

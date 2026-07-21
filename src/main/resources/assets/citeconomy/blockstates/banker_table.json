@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "citeconomy:block/banker_table" }
+  }
+}

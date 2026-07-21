@@ -1,0 +1,35 @@
+{
+  "display": {
+    "icon": {
+      "item": "citeconomy:bankbook"
+    },
+    "title": {
+      "translate": "advancement.citeconomy.root.title"
+    },
+    "description": {
+      "translate": "advancement.citeconomy.root.desc"
+    },
+    "background": "minecraft:textures/gui/advancements/backgrounds/adventure.png",
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_bankbook": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "citeconomy:bankbook"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_bankbook"
+    ]
+  ]
+}

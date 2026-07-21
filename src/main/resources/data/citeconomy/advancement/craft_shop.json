@@ -1,0 +1,35 @@
+{
+  "display": {
+    "icon": {
+      "item": "citeconomy:personal_shop"
+    },
+    "title": {
+      "translate": "advancement.citeconomy.craft_shop.title"
+    },
+    "description": {
+      "translate": "advancement.citeconomy.craft_shop.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "citeconomy:root",
+  "criteria": {
+    "has_shop": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "citeconomy:personal_shop"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_shop"
+    ]
+  ]
+}

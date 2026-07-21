@@ -2,7 +2,7 @@
 
 > Mod custom NeoForge 1.21.1 pour le serveur RP « La Première Cité »
 > (modpack *Create Ultimate Selection 2*, MC 1.21.1, NeoForge).
-> Ce document est le **blueprint** : il décrit CE QU'ON CONSTRUIT et POURQUOI, pas encore le code ligne par ligne.
+> Mod ID : `citeconomy` · Groupe : `com.citeconomy` · Langue : Java 21 · Build : Gradle + MDK 2.0.142
 
 ---
 
@@ -34,12 +34,12 @@ Objectif de l'économie :
 
 ### Deux circuits d'argent (règle d'or de l'équilibre)
 
-**🟡 Circuit 1 — Création de monnaie (le « robinet »)**
+**Circuit 1 — Création de monnaie (le « robinet »)**
 Seuls **deux** canaux font entrer des émeraudes **neuves** dans l'économie :
 1. les **mines** (minerai d'émeraude) ;
 2. les **contrats Bountiful** (payés en émeraudes).
 
-**🟢 Circuit 2 — Circulation & redistribution (aucune création)**
+**Circuit 2 — Circulation & redistribution (aucune création)**
 Ne créent **aucune** émeraude — ils ne font que déplacer de l'argent existant :
 - le **marché central**, les **boutiques perso** et les **paiements directs** (joueur → joueur) ;
 - les **commandes municipales**, **payées par le Trésor** (donc par les taxes déjà collectées).
@@ -54,7 +54,7 @@ Ne créent **aucune** émeraude — ils ne font que déplacer de l'argent exista
 > que les commandes municipales puissent tourner **dès le jour 1**. C'est une dotation **unique**,
 > pas un robinet récurrent : ensuite le Trésor ne se remplit que par les taxes.
 
-**🔻 Les drains**
+**Les drains**
 - Les **besoins des villageois** consomment des produits payés par le Trésor (l'argent ressort).
 - Les **échanges villageois** où le joueur **achète** un objet contre des émeraudes retirent de
   la monnaie.
@@ -67,82 +67,238 @@ Ne créent **aucune** émeraude — ils ne font que déplacer de l'argent exista
 
 ## 3. Composants du mod
 
-Le mod regroupe six systèmes. Chacun est indépendant et testable séparément.
+Le mod regroupe **sept** systèmes. Chacun est indépendant et testable séparément.
 
 ### 3.1 Banque + Villageois Banquier
 
-- **Compte virtuel par joueur** (solde en crédits), persistant, sauvegardé côté serveur.
-- **Villageois Banquier** : métier custom.
-  - **Ne spawn jamais naturellement.** Un villageois devient Banquier uniquement si un joueur
-    **fabrique et pose sa table de métier** (bloc « Table du Banquier »).
-  - Interagir avec lui ouvre le menu de la banque.
-- Opérations :
-  - **Dépôt** : émeraudes physiques → crédits (`1 émeraude → 100 crédits`).
-  - **Retrait** : crédits → émeraudes physiques (par tranche de 100). Les crédits en dessous de
-    100 restent sur le compte.
-  - **Consulter** le solde et l'**historique** des transactions.
+#### Resource Locations
+- `citeconomy:banker_table` — bloc (Table du Banquier)
+- `citeconomy:banker_poi` — type de point d'intérêt (POI)
+- `citeconomy:banker` — profession de villageois
+- `citeconomy:bank_menu` — type de menu
+
+#### Comptes
+- **Compte virtuel par joueur** (solde en crédits), persistant, sauvegardé côté serveur
+  dans `EconomyData` (SavedData, fichier `data/citeconomy_data`).
+- Stocké dans une `Map<UUID, Integer>`.
+
+#### Villageois Banquier
+- **Ne spawn jamais naturellement.** Un villageois devient Banquier uniquement si un joueur
+  **fabrique et pose sa table de métier** (bloc `citeconomy:banker_table`).
+- Interaction → ouvre le menu de la banque (`BankMenu` + `BankScreen`).
+- Handler : `ServerEvents.onEntityInteract()` — intercepte `PlayerInteractEvent.EntityInteract`
+  sur tout `Villager` avec la profession `BANKER_PROFESSION`.
+
+#### Table du Banquier (bloc)
+- **Comportement** : bloc de métier (job site block). Un villageois le détecte et peut
+  acquérir la profession `citeconomy:banker`.
+- **POI** : `BankerPOI` lié aux `BlockState` de `BANKER_TABLE`.
+- **Exigence technique** : le POI `citeconomy:banker_poi` DOIT être listé dans le tag
+  `minecraft:point_of_interest_type/acquirable_job_site.json` pour que les villageois
+  puissent l'acquérir. Fichier à créer :
+  ```json
+  {
+    "values": ["citeconomy:banker_poi"]
+  }
+  ```
+  Emplacement : `src/main/resources/data/minecraft/tags/point_of_interest_type/acquirable_job_site.json`
+- **Constructible** : craft en forme (3 émeraudes en haut, 3 planches au milieu, 2 planches en bas).
+
+#### Opérations bancaires
+- **Dépôt** : émeraudes physiques → crédits (ratio 1:100). Le joueur clique "Déposer"
+  dans le menu → `BankTransactionPayload` (C→S) → le serveur cherche les émeraudes
+  dans l'inventaire du joueur, les retire, ajoute les crédits → répond `SyncBalancePayload`.
+- **Retrait** : crédits → émeraudes physiques (par tranche de 100). Les crédits en dessous
+  de 100 restent sur le compte.
+- **Solde** : affiché dans l'écran banque + via le `BankbookItem` (use → message en chat).
+
+#### État actuel du code
+- Banquier fonctionnel (profession, POI, menu, dépôt/retrait).
+- Tag `acquirable_job_site.json` : OK (banker_poi + merchant_poi).
+
+---
 
 ### 3.2 Marché central + Villageois Marchand
 
-- **Villageois Marchand** : métier custom.
-  - **Ne spawn jamais naturellement.** Nécessite un bloc « Comptoir du Marchand » fabriqué et posé.
-  - Situé dans le bâtiment du marché (choix des joueurs).
-- **Place de marché joueur-à-joueur** :
-  - un joueur met un objet en vente au **prix qu'il veut** (prix libre) ;
-  - l'objet est mis en **dépôt (escrow) côté serveur** — retiré de l'inventaire, gardé en sûreté ;
-  - un autre joueur l'achète, **même si le vendeur est déconnecté** ;
-  - le paiement se fait en **crédits** (débité de l'acheteur, crédité au vendeur) ;
-  - **on peut vendre n'importe quoi** (objet non demandé compris) ;
-  - **taxe de 5 %** prélevée sur chaque vente → **Trésor de la Cité**.
+**✅ IMPLÉMENTÉ** voir `ServerEvents.java`, `MarketCommand.java`, `MarketMenu.java`, `MarketScreen.java`.
+
+#### Resource Locations
+- `citeconomy:merchant_counter` — bloc (Comptoir du Marchand)
+- `citeconomy:merchant_poi` — type de point d'intérêt
+- `citeconomy:merchant` — profession de villageois
+- `citeconomy:market_menu` — type de menu
+
+#### Villageois Marchand
+- **Ne spawn jamais naturellement.** Nécessite un bloc « Comptoir du Marchand » fabriqué et posé.
+- Situé dans le bâtiment du marché (choix des joueurs).
+- Interaction → ouvre le menu du marché.
+
+#### Place de marché joueur-à-joueur
+- un joueur met un objet en vente au **prix qu'il veut** (prix libre) ;
+- l'objet est mis en **dépôt (escrow) côté serveur** — retiré de l'inventaire, gardé en sûreté
+  dans une `Map<UUID, List<MarketListing>>` dans `EconomyData` ;
+- un autre joueur l'achète, **même si le vendeur est déconnecté** ;
+- le paiement se fait en **crédits** (débité de l'acheteur, crédité au vendeur) ;
+- **on peut vendre n'importe quoi** (objet non demandé compris) ;
+- **taxe de 5 %** prélevée sur chaque vente → **Trésor de la Cité**.
+
+---
 
 ### 3.3 Boutiques personnelles (bloc-boutique)
 
+#### Resource Locations
+- `citeconomy:personal_shop` — bloc (Boutique Personnelle)
+- `citeconomy:personal_shop` — type de block entity
+- `citeconomy:personal_shop_menu` — type de menu
+
+#### Fonctionnement
 - **Bloc craftable** que chaque joueur pose où il veut (maison, quartier, place…).
-- **Vente uniquement** (l'achat automatique par le bloc est une évolution future, hors périmètre).
-- Le propriétaire **remplit le bloc** de son stock et fixe un **prix libre**.
-- Un client interagit → paie en **crédits** → reçoit l'objet ; le compte du proprio est crédité,
-  **même hors ligne** (le bloc garde le stock).
-- **Taxe de 2 %** → Trésor de la Cité (plus faible qu'au marché central : récompense l'effort de
-  construire une vraie boutique).
-- Le bloc n'est utilisable que par son **propriétaire** pour le remplir/reprendre le stock.
+- Recette : planches + coffre.
+- **Vente uniquement** (l'achat automatique par le bloc est une évolution future).
+- Le propriétaire **remplit le bloc** de son stock (27 slots) et fixe un **prix libre**
+  (prix unique pour tous les slots, stocké dans le `CompoundTag` de la block entity).
+- Un client interagit → ouvre le menu → clique sur un slot → envoie `ShopBuyPayload` (C→S)
+  → le serveur vérifie le solde, prélève le prix, applique la **taxe de 2 %** (→ Trésor),
+  crédite le vendeur, retire l'item du stock et le donne à l'acheteur.
+- Le vendeur est crédité **même hors ligne** (le bloc garde le stock côté serveur).
+- Seul le propriétaire peut remplir/reprendre le stock (vérification `ownerId`).
+
+#### Block Entity (`PersonalShopBlockEntity`)
+- Stocke : `ownerId` (UUID), `ownerName` (String), `price` (int), `inventory` (ItemStackHandler, 27 slots).
+- Persistance : `saveAdditional()` / `loadAdditional()` via NBT.
+- **BUG CONNU** : `setOwner()` n'est appelé nulle part actuellement.
+  **Correction nécessaire** : dans `PersonalShopBlock`, override `setPlacedBy()` pour appeler
+  `blockEntity.setOwner(player.getUUID(), player.getName().getString())` au placement du bloc.
+  Sans cette correction, `ownerId = null` → impossible de vérifier le propriétaire → n'importe
+  qui peut modifier le stock, et les achats échouent.
+
+---
 
 ### 3.4 Paiements directs entre joueurs
 
-Deux méthodes, **même système sécurisé**, même historique :
-1. **Carnet bancaire** (objet) : ouvre un menu, choisir le destinataire, saisir le montant,
-   **confirmer** avant l'envoi. Méthode principale, adaptée aux débutants.
-2. **Commande `/payer <joueur> <montant>`** : raccourci rapide.
+#### Resource Locations
+- `citeconomy:bankbook` — item (Carnet Bancaire)
 
-- Fonctionne **même si le destinataire est déconnecté**.
+#### Méthode 1 : Carnet Bancaire (objet)
+- **État actuel** : `BankbookItem.use()` envoie simplement le solde en message chat.
+- **Comportement attendu (non implémenté)** : doit ouvrir un menu avec :
+  1. champ de saisie du destinataire (auto-complétion des joueurs connectés)
+  2. champ de saisie du montant
+  3. bouton de confirmation avant envoi
+- L'implémentation du menu carnet est à faire.
+
+#### Méthode 2 : Commande `/payer`
+- **Implémentée** dans `EconomyCommand.register()`.
+- Syntaxe : `/payer <joueur> <montant>`
+- Validations : pas de paiement à soi-même, fonds suffisants.
+- Fonctionne **même si le destinataire est déconnecté** (économise sur le UUID).
 - **Sans taxe** (transfert privé, pas une vente).
-- Chaque opération apparaît dans l'**historique des deux comptes**.
+
+---
 
 ### 3.5 Trésor de la Cité
 
-- **Compte spécial** (pas un joueur) qui reçoit **toutes les taxes** (5 % marché, 2 % boutiques).
-- **Démarre avec un budget de départ** (montant configurable) pour lancer les commandes dès le
-  jour 1. Dotation unique ; ensuite alimenté uniquement par les taxes.
+#### Fonctionnement
+- **Compte spécial** dans `EconomyData` (pas un joueur) qui reçoit **toutes les taxes** :
+  - 5 % des ventes du marché central (non implémenté)
+  - 2 % des ventes des boutiques personnelles (implémenté dans `ShopBuyPayload`)
+- **Démarre avec un budget de départ** (dotation unique). Valeur par défaut proposée :
+  `5000 crédits (= 50 émeraudes)`.
 - Sert à **financer les commandes municipales** (§3.6).
-- **Consultable** par tous ; **modifiable** seulement par les administrateurs / le rôle RP « Trésorier »
-  (commandes admin pour ajuster taux de taxe et solde selon les lois RP).
+- Si le Trésor est vide → plus de commandes publiées.
+- **Consultable** par tous ; **modifiable** seulement via les commandes admin `/citeconomy admin treasury`.
+- Commandes : `/citeconomy treasury set <montant>`, `/citeconomy treasury add <montant>`.
+
+#### Commandes admin
+- `/citeconomy admin set <joueur> <montant>` — fixer le solde d'un joueur
+- `/citeconomy admin add <joueur> <montant>` — ajouter des crédits
+- `/citeconomy admin remove <joueur> <montant>` — retirer des crédits
+- `/citeconomy treasury set <montant>` — fixer le Trésor
+- `/citeconomy treasury add <montant>` — ajouter au Trésor
+- `/citeconomy cycle` — exécuter le cycle économique manuellement (debug/forced)
+
+---
 
 ### 3.6 Besoins de la population + Prospérité
 
+**✅ IMPLÉMENTÉ** voir `WeeklyQuest.java`, `NeedsCommand.java`, `NeedsMenu.java`, `NeedsScreen.java`, `QuestCompletePayload.java`.
+
 Le système qui donne une « vie » économique à la ville sans MineColonies.
 
+#### Cycle
 1. **Chaque semaine (de jeu)**, le Marchand publie automatiquement des **commandes municipales**
-   selon le **nombre de villageois** : nourriture, laine/vêtements, outils, torches, bois, pierre,
-   objets de confort…
-2. Les joueurs **remplissent** ces commandes.
+   selon le **nombre de villageois** dans un rayon de la ville.
+2. Les joueurs **remplissent** ces commandes en livrant les items demandés.
 3. Le **Trésor les paie en crédits** (argent déjà taxé, pas d'émeraudes neuves créées).
 4. Les produits livrés sont **consommés** par la population (drain).
-5. Si les besoins sont satisfaits → la **Prospérité de la Cité** monte → **débloque** plus de
-   commandes, de meilleures récompenses, de nouvelles capacités commerciales.
-6. Si le **Trésor est vide** → **plus de commandes** publiées : aucune monnaie n'est créée
-   gratuitement.
+5. Si les besoins sont satisfaits → la **Prospérité de la Cité** monte.
+6. Si le **Trésor est vide** → **plus de commandes** publiées.
+
+#### Métriques à définir
+- Cycle de temps : 1 semaine MC = 7 jours MC = 168 000 ticks (à 20 ticks/s).
+- Les commandes sont stockées dans `EconomyData` sous forme de `List<MunicipalOrder>`.
+- Les besoins sont catégorisés par `ItemTag` NeoForge :
+  - `citeconomy:needs/food` — toute nourriture comestible
+  - `citeconomy:needs/wool` — laine + produits dérivés
+  - `citeconomy:needs/tools` — outils en pierre/fer
+  - `citeconomy:needs/torches` — torches + lanternes
+  - `citeconomy:needs/wood` — bois + planches
+  - `citeconomy:needs/stone` — pierre taillée, briques
+  - `citeconomy:needs/comfort` — lits, verrières, décorations
+
+#### Palier de Prospérité (à valider)
+| Score | Nom | Effets |
+|-------|-----|--------|
+| 0-50 | Hameau | Commandes de base (nourriture, torches) |
+| 50-200 | Village | + commandes outils, laine. Taxe boutiques 1% |
+| 200-500 | Ville | + commandes bois, pierre. Taxe marché 3% |
+| 500+ | Cité | Toutes commandes. Nouvelles capacités RP |
 
 > Les villageois ne construisent rien eux-mêmes : ils créent une **demande économique permanente**.
 > Ce sont toujours les joueurs qui bâtissent et font évoluer la ville.
+
+---
+
+### 3.7 Entreprises
+
+Système permettant à des groupes de joueurs de créer une entreprise commune.
+Une entreprise a un compte bancaire partagé, des employés, et un salaire configurable.
+
+#### Resource Locations
+- Commande : `/entreprise`
+- Classe : `Company` stockée dans `EconomyData.companies` (`Map<UUID, Company>`)
+
+#### Commandes
+| Commande | Qui peut | Description |
+|----------|----------|-------------|
+| `/entreprise creer <nom>` | Joueur sans entreprise | Crée une entreprise. Le créateur devient propriétaire + 1er employé |
+| `/entreprise inviter <joueur>` | Propriétaire | Envoie une invitation |
+| `/entreprise accepter` | Joueur invité | Accepte l'invitation en attente |
+| `/entreprise deposer <montant>` | Tout employé | Dépose des crédits personnels → compte entreprise |
+| `/entreprise retirer <montant>` | Propriétaire uniquement | Retire des crédits → compte personnel |
+| `/entreprise salaire <montant>` | Propriétaire | Fixe le salaire par cycle (0 = pas de salaire) |
+| `/entreprise quitter` | Employé (sauf proprio) | Quitte l'entreprise |
+| `/entreprise dissoudre` | Propriétaire | Dissout l'entreprise, distribue le solde à tous les employés |
+| `/entreprise infos` | Tout employé | Affiche les infos (nom, proprio, solde, salaire, employés) |
+
+#### Stockage (`Company`)
+- `UUID id`, `String name`, `UUID owner`, `int balance`, `int salary` (défaut: 100), `Set<UUID> employees`
+- Persistance NBT via `Company.save()` / `Company.load()`.
+
+#### Cycle économique automatique
+- Déclenché toutes les 24 000 ticks (1 jour Minecraft) via `ServerTickEvent.Post`.
+- Pour chaque entreprise :
+  1. **Taxe** : 10 % du solde de l'entreprise → Trésor (incite à ne pas thésauriser)
+  2. **Salaires** : `salaire` crédits à chaque employé depuis le compte entreprise
+     (déplacement, pas création de monnaie)
+- Si l'entreprise n'a pas assez pour payer tous les salaires, seuls les premiers sont payés.
+- Les joueurs connectés reçoivent un message. Le cycle tourne même si personne n'est connecté.
+
+#### Équilibre économique
+- La société ne crée **pas** d'argent : les salaires sont prélevés de son compte, les dépôts viennent
+  des comptes personnels des employés.
+- La taxe de 10% alimente le Trésor et redistribue à la ville via les commandes municipales.
+- Utile pour : financer des achats de groupe, récompenser les employés, spécialisation RP.
 
 ---
 
@@ -160,40 +316,136 @@ Le système qui donne une « vie » économique à la ville sans MineColonies.
 
 ---
 
-## 5. Sécurité & anti-abus (exigences dures)
+## 5. Paquets réseau (CustomPacketPayload)
+
+| Payload | Direction | Contenu | Usage |
+|---------|-----------|---------|-------|
+| `BankTransactionPayload` | C → S | `boolean isDeposit`, `int amount` | Déposer/retirer des émeraudes |
+| `SyncBalancePayload` | S → C | `int balance` | Sync solde après opération |
+| `ShopBuyPayload` | C → S | `BlockPos pos`, `int slot` | Acheter un item en boutique |
+| `SetShopPricePayload` | C → S | `BlockPos pos`, `int price` | Définir le prix d'une boutique |
+| `BankbookPayPayload` | C → S | `UUID target`, `int amount` | Paiement via carnet bancaire |
+| `MarketBuyPayload` | C → S | `UUID listingId` | Acheter une annonce du marché |
+| `MarketListingsPayload` | S → C | `List<Entry>` | Sync des annonces du marché |
+| `NeedsDataPayload` | S → C | `List<WeeklyQuest>` | Sync des besoins au client |
+| `QuestCompletePayload` | C → S | `int questId` | Réclamer la récompense d'un besoin |
+
+Registrar : `ModNetworking.register()` — version `"1"`.
+
+## 5b. Commande de consultation
+
+| Commande | Perf | Description |
+|----------|------|-------------|
+| `/solde` | Joueur | Affiche le solde + rappel de `/historique` |
+| `/historique` | Joueur | Affiche les 10 dernières transactions du joueur |
+| `/citeconomy admin history <joueur>` | OP | Affiche les 20 dernières transactions d'un joueur |
+
+### TransactionLog
+
+Enregistré dans `EconomyData.transactionHistory` (`Map<UUID, List<TransactionLog>>`), max 50 par joueur.
+Chaque log : `timestamp`, `type` (CREDIT/DEBIT/SALARY), `amount`, `balanceAfter`, `description`, `secondParty`.
+Persistance NBT via `TransactionLog.save()` / `TransactionLog.load()`. Toute opération monétaire
+(banque, paiement, achat, salaire, admin) enregistre automatiquement un log.
+
+---
+
+## 6. Sécurité & anti-abus (exigences dures)
 
 - **Aucune duplication** : un objet en vente est soit en escrow serveur, soit dans le bloc — jamais
   aussi dans l'inventaire du joueur. Toute opération argent + objet doit être **atomique**.
-- **Aucune création d'argent hors robinet** : banque, marché, boutiques, /payer ne font que déplacer.
-- **Ventes/paiements hors ligne fiables** : l'état vit côté serveur (données sauvegardées), pas dans
-  la session du joueur.
-- **Confirmation** obligatoire avant un paiement direct (éviter les erreurs de montant).
-- **Contrôle d'accès** : seul le proprio remplit/vide son bloc-boutique ; seuls les admins touchent
-  le Trésor et les taux.
-- **Historique** de toutes les transactions pour audit RP et débogage.
+  Vérifié dans `ShopBuyPayload.handleData()` : extraction atomique via `extractItem()`.
+- **Aucune création d'argent hors robinet** : banque, marché, boutiques, `/payer` ne font que déplacer.
+  **Exception** : le cycle économique (`/citeconomy cycle`) ne crée pas d'argent non plus — il
+  redistribue depuis les comptes entreprises.
+- **Ventes/paiements hors ligne fiables** : l'état vit côté serveur (`EconomyData`, `SavedData`,
+  `PersonalShopBlockEntity`), pas dans la session du joueur.
+- **Confirmation** : obligatoire avant un paiement direct (le carnet bancaire, quand il sera
+  implémenté, aura un écran de confirmation ; `/payer` est immédiat).
+- **Contrôle d'accès** : seul le proprio remplit/vide son bloc-boutique (vérification `ownerId`) ;
+  seuls les admins touchent le Trésor (permission OP level 2).
+- **Historique** : **✅ IMPLÉMENTÉ** via `TransactionLog.java` + commandes `/historique` et `/citeconomy admin history`.
+  Devra être ajouté dans `EconomyData` sous forme de `List<TransactionLog>`.
 
 ---
 
-## 6. Correspondance technique (NeoForge 1.21.1)
+## 7. Correspondance technique (NeoForge 1.21.1)
 
-Indications de mise en œuvre (détaillées ensuite dans le plan d'implémentation) :
+### Registres (DeferredRegister)
 
-- **Comptes / Trésor / annonces marché** → `SavedData` (données attachées au monde, persistées).
-- **Villageois Banquier / Marchand** → `VillagerProfession` custom + `PoiType` custom lié au bloc de
-  métier ; blocs de métier enregistrés dans le POI pour l'acquisition du métier.
-- **Menus (banque, marché, carnet)** → `MenuType` + écran client + **paquets réseau** (`CustomPacketPayload`)
-  pour les actions (déposer, acheter, payer…), toute la logique **validée côté serveur**.
-- **Bloc-boutique** → `Block` + `BlockEntity` (stock + prix + proprio) + menu.
-- **Commande `/payer`** → `Commands` (Brigadier), argument joueur + montant.
-- **Publication hebdo des commandes + prospérité** → compteur de ticks serveur, déclenché sur un
-  cycle de jours de jeu.
+| Registre | Classe | Éléments |
+|----------|--------|----------|
+| BLOCKS | `ModBlocks` | `banker_table`, `personal_shop` |
+| ITEMS | `ModItems` | `banker_table` (BlockItem), `bankbook`, `personal_shop` (BlockItem) |
+| BLOCK_ENTITIES | `ModBlockEntities` | `personal_shop` |
+| MENUS | `ModMenus` | `bank_menu`, `personal_shop_menu` |
+| CREATIVE_MODE_TABS | `ModCreativeTabs` | `citeconomy_tab` |
+| POI_TYPES | `ModVillagers` | `banker_poi` |
+| VILLAGER_PROFESSIONS | `ModVillagers` | `banker` |
 
-Tout enregistrement passe par les `DeferredRegister` NeoForge (blocs, items, block entities,
-menus, professions, POI, commandes via events).
+### Données sauvegardées (`SavedData`)
+- `EconomyData` — attaché au monde de l'Overworld.
+- Stocke : `Map<UUID, Integer> balances`, `Map<UUID, Company> companies`, `int treasuryBalance`.
+- Factory : `EconomyData.factory()` → load/save via NBT.
+- Toutes les méthodes de modification appellent `setDirty()`.
+
+### Structures
+
+#### Structure des dossiers
+```
+src/main/
+├── java/com/citeconomy/
+│   ├── CiteconomyMod.java
+│   ├── block/
+│   │   ├── PersonalShopBlock.java
+│   │   └── entity/
+│   │       └── PersonalShopBlockEntity.java
+│   ├── client/
+│   │   ├── ClientEvents.java
+│   │   ├── ClientState.java
+│   │   └── gui/
+│   │       ├── BankScreen.java
+│   │       └── PersonalShopScreen.java
+│   ├── command/
+│   │   ├── CompanyCommand.java
+│   │   └── EconomyCommand.java
+│   ├── data/
+│   │   ├── Company.java
+│   │   └── EconomyData.java
+│   ├── event/
+│   │   └── ServerEvents.java
+│   ├── item/
+│   │   └── BankbookItem.java
+│   ├── menu/
+│   │   ├── BankMenu.java
+│   │   └── PersonalShopMenu.java
+│   ├── network/
+│   │   ├── BankTransactionPayload.java
+│   │   ├── ModNetworking.java
+│   │   ├── ShopBuyPayload.java
+│   │   └── SyncBalancePayload.java
+│   └── registry/
+│       ├── ModBlockEntities.java
+│       ├── ModBlocks.java
+│       ├── ModCreativeTabs.java
+│       ├── ModItems.java
+│       ├── ModMenus.java
+│       └── ModVillagers.java
+├── resources/
+│   ├── assets/citeconomy/
+│   │   ├── blockstates/ (banker_table, personal_shop)
+│   │   ├── lang/ (en_us, fr_fr)
+│   │   ├── models/block/ (banker_table, personal_shop)
+│   │   ├── models/item/ (bankbook, banker_table, personal_shop)
+│   │   └── textures/block/ (banker_table, personal_shop)
+│   │       textures/item/ (bankbook)
+│   └── data/citeconomy/recipe/ (bankbook, banker_table, personal_shop)
+└── templates/
+    └── META-INF/neoforge.mods.toml
+```
 
 ---
 
-## 7. Configuration externe (hors mod custom)
+## 8. Configuration externe (hors mod custom)
 
 Deux réglages du pack, indépendants du mod, mais indispensables à l'équilibre :
 
@@ -208,33 +460,60 @@ Deux réglages du pack, indépendants du mod, mais indispensables à l'équilibr
 
 ---
 
-## 8. Ordre de construction proposé (phases)
+## 9. État d'avancement & bugs connus
 
-Même si tout est codé à la main, on livre **par tranches testables** :
+### Ce qui est implémenté
+- [x] Phase 1 — Fondations (mod, registries, SavedData, commandes admin)
+- [x] Phase 2 — Banque (Banker, dépôt/retrait, menu basique, BankbookItem basique)
+- [x] Phase 3 — Carnet bancaire (menu, destinataire, montant, confirmation) — *via Antigravity (?)*
+- [x] Phase 4 — Boutiques perso (bloc, block entity, menu, achat via clic)
+- [x] Phase 5 — Marché central (Marchand, Comptoir, escrow, `/marche vendre`, menu achat)
+- [x] Paiements directs (`/payer`)
+- [x] Système Entreprise amélioré (Company, 9 commandes, cycle éco automatique)
+- [x] Textures, modèles, lang, recettes
 
-1. **Fondations** : mod qui charge, monnaie/crédits, comptes, `SavedData`, commandes admin de base.
-2. **Banque** : Villageois Banquier + table de métier + dépôt/retrait + menu + historique.
-3. **Paiements** : carnet bancaire + `/payer` + confirmations.
-4. **Boutiques perso** : bloc-boutique + escrow dans le bloc + taxe 2 %.
-5. **Marché central** : Villageois Marchand + comptoir + annonces + escrow serveur + taxe 5 %.
-6. **Trésor + Besoins/Prospérité** : commandes municipales hebdo + consommation + prospérité.
+### Ce qui manque
+- [ ] Rien pour l'instant (toutes les phases sont implémentées)
 
-En parallèle (config pack) : **MoreJS** + **Bountiful** dès la phase 1 pour une économie de base
-jouable rapidement.
+### Bugs — tous corrigés
+
+| # | Bug | Fichier | Statut |
+|---|-----|---------|--------|
+| 1 | Tag POI `acquirable_job_site.json` manquant → le Banquier ne peut pas être acquis | `ModVillagers` | ✅ Corrigé (présent dans `/data/minecraft/tags/`) |
+| 2 | `setOwner()` jamais appelé → `ownerId = null` → boutique cassée | `PersonalShopBlock.java` | ✅ Corrigé |
+| 3 | BankScreen limité à 1 émeraude — pas de champ montant | `BankScreen.java` | ✅ Corrigé |
+| 4 | BankTransactionPayload : retrait sans vérif de place inventaire | `BankTransactionPayload.java` | ✅ Corrigé |
+| 5 | Pas d'historique des transactions | `EconomyData.java` | ✅ Corrigé |
 
 ---
 
-## 9. Décisions prises & questions restantes
+## 10. Configuration (valeurs par défaut proposées)
 
-Décidé :
+Ces valeurs seront placées dans un fichier de config (`.toml`) via NeoForge :
 
+| Propriété | Valeur par défaut | Description |
+|-----------|------------------|-------------|
+| `treasury.startingBudget` | `5000` | Budget de départ du Trésor (en crédits) |
+| `tax.market` | `5` | Taxe du marché central (%) |
+| `tax.shop` | `2` | Taxe des boutiques personnelles (%) |
+| `tax.company` | `10` | Taxe des entreprises (%) |
+| `salary.company` | `100` | Salaire par employé par cycle (crédits) |
+| `cycle.interval` | `24000` | Ticks entre chaque cycle éco (1 jour MC) |
+
+---
+
+## 11. Décisions prises & questions restantes
+
+### Décidé
 - **`modid` = `citeconomy`** (nom technique du mod).
 - **Budget de départ du Trésor** activé → commandes municipales dès le jour 1 (dotation unique
-  configurable).
+  configurable, valeur proposée : 5000 crédits).
 - **Aucun plafond** de retrait, d'annonces ou de boutiques par joueur — on reste simple.
+- **Entreprises** : présent dans le code mais pas dans le design original — à valider.
 
-À détailler dans le plan d'implémentation (pas bloquant) :
-
-- Détail exact des besoins hebdo par palier de population et de la courbe de Prospérité.
-- Montant par défaut du budget de départ et des taux de taxe (valeurs de config).
-- Apparence des blocs (textures, modèles) — cosmétique, après le fonctionnel.
+### Questions en suspens
+- Système d'entreprise : on garde ou on supprime ?
+- Détail exact des besoins hebdo par palier de population et de la courbe de Prospérité
+  (voir §3.6 pour la proposition).
+- Apparence des blocs (textures, modèles) — les textures actuelles sont provisoires
+  (bloc carré `cube_all` avec texture custom).
