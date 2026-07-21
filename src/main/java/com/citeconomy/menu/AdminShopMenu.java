@@ -34,7 +34,7 @@ public class AdminShopMenu extends AbstractContainerMenu {
             int fi = i;
             int col = i % 9;
             int row = i / 9;
-            addSlot(new Slot(dummy, i, 8 + col * 18, 18 + row * 20) {
+            addSlot(new Slot(dummy, i, 8 + col * 18, 24 + row * 20) {
                 @Override
                 public boolean mayPickup(Player player) { return false; }
                 @Override
@@ -48,11 +48,11 @@ public class AdminShopMenu extends AbstractContainerMenu {
 
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inv, col + row * 9 + 9, 8 + col * 18, 62 + row * 18));
+                addSlot(new Slot(inv, col + row * 9 + 9, 8 + col * 18, 74 + row * 18));
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inv, col, 8 + col * 18, 120));
+            addSlot(new Slot(inv, col, 8 + col * 18, 132));
         }
     }
 
@@ -84,6 +84,17 @@ public class AdminShopMenu extends AbstractContainerMenu {
             return;
         }
         super.clicked(slotId, button, clickType, player);
+    }
+
+    public int getShopItemCount() {
+        return shopItems.size();
+    }
+
+    public int getPriceAt(int index) {
+        if (index >= 0 && index < shopItems.size()) {
+            return shopItems.get(index).priceCredits();
+        }
+        return 0;
     }
 
     @Override
